@@ -1,4 +1,6 @@
 using System;
+using System.Collections;
+using System.Collections.Generic;
 using System.IO;
 using System.Text;
 using System.Threading;
@@ -21,6 +23,7 @@ namespace ScrollsPost {
         public ReplayRunner replayRunner;
         public DeckManager deckManager;
         //private ReplayGUI replayGUI;
+        private GameSocket gs;
 
         private Type deckType;
         private Type battleType;
@@ -89,32 +92,28 @@ namespace ScrollsPost {
         public static int GetVersion() {
             return CURRENT_VERSION - 1;
         }
-
         public static MethodDefinition[] GetHooks(TypeDefinitionCollection scrollsTypes, int version) {
             try {
                 return new MethodDefinition[] {
                     scrollsTypes["Communicator"].Methods.GetMethod("sendRequest", new Type[]{ typeof(Message) }),
-                    scrollsTypes["TradeSystem"].Methods.GetMethod("StartTrade")[0],
+                    scrollsTypes["TradeSystem"].Methods.GetMethod("StartTrade", new Type[]{ typeof( List<Card>), typeof( List<Card>) ,typeof( string), typeof( string ), typeof( int) }),
                     scrollsTypes["TradeSystem"].Methods.GetMethod("CloseTrade")[0],
-                    scrollsTypes["TradeSystem"].Methods.GetMethod("UpdateView")[0],
-                    scrollsTypes["CardView"].Methods.GetMethod("updateGraphics")[0],
+                    scrollsTypes["TradeSystem"].Methods.GetMethod("UpdateView", new Type[]{typeof(bool), typeof(TradeInfo), typeof(TradeInfo)}),
+                    scrollsTypes["CardView"].Methods.GetMethod("updateGraphics",new Type[]{typeof(Card)}),
 
                     scrollsTypes["AnimPlayer"].Methods.GetMethod("UpdateOnly")[0],
 
-                    scrollsTypes["Communicator"].Methods.GetMethod("handleNextMessage")[0],
-                    scrollsTypes["Communicator"].Methods.GetMethod("Update")[0],
-
                     scrollsTypes["EndGameScreen"].Methods.GetMethod("GoToLobby")[0],
 
-                    scrollsTypes["BattleMode"].Methods.GetMethod("addDelay")[0],
-                    scrollsTypes["BattleMode"].Methods.GetMethod("effectDone")[0],
-                    scrollsTypes["iTween"].Methods.GetMethod("Launch")[0],
+                    scrollsTypes["BattleMode"].Methods.GetMethod("addDelay",new Type[]{typeof(float)}),
+                    scrollsTypes["iTween"].Methods.GetMethod("Launch",new Type[]{typeof(GameObject),typeof(Hashtable)}),
                     scrollsTypes["BattleMode"].Methods.GetMethod("OnGUI")[0],
-                    scrollsTypes["BattleModeUI"].Methods.GetMethod("ShowEndTurn")[0],
+                    scrollsTypes["BattleModeUI"].Methods.GetMethod("ShowEndTurn",new Type[]{typeof(bool)}),
                     scrollsTypes["GUIBattleModeMenu"].Methods.GetMethod("toggleMenu")[0],
 
-                    scrollsTypes["DeckBuilder2"].Methods.GetMethod("OnGUI")[0]
+                    scrollsTypes["DeckBuilder2"].Methods.GetMethod("OnGUI")[0],
 
+                    scrollsTypes["GameSocket"].Methods.GetMethod("Init", new Type[]{ typeof(ISocketListener) }),
                     //scrollsTypes["ProfileMenu"].Methods.GetMethod("Start")[0],
                 };
             } catch( Exception ex ) {
@@ -133,18 +132,7 @@ namespace ScrollsPost {
                     return true;
                 }
             } else if( replayRunner != null ) {
-                if( info.targetMethod.Equals("Update") ) {
-                    replayRunner.OnUpdate();
-                    nextReturnVal = true;
-                    return true;
-
-                } else if( info.targetMethod.Equals("handleNextMessage") ) {
-                    if( replayRunner.OnHandleNextMessage() ) {
-                        nextReturnVal = true;
-                        return true;
-                    }
-
-                } else if( info.targetMethod.Equals("addDelay") ) {
+                if( info.targetMethod.Equals("addDelay") ) {
                     if( replayRunner.SpeedUpGame() ) {
                         nextReturnVal = true;
                         return true;
@@ -221,12 +209,12 @@ namespace ScrollsPost {
                 Init();
 
             } else if( replayRunner != null ) {
-                if( info.targetMethod.Equals("OnGUI") && info.target.GetType() == battleType ) {
+                if ( info.target is BattleMode && info.targetMethod.Equals("OnGUI") && info.target.GetType() == battleType)
+                {
                     replayRunner.OnBattleGUI(info);
-                } else if( info.targetMethod.Equals("UpdateOnly") ) {
+                } else if (info.targetMethod.Equals("UpdateOnly"))
+                {
                     replayRunner.OnAnimationUpdate(info);
-                } else if( info.targetMethod.Equals("effectDone") ) {
-                    replayRunner.OnBattleEffectDone(info);
                 }
             }
         }
@@ -240,6 +228,12 @@ namespace ScrollsPost {
                 deckManager.OnGUI(info.target as DeckBuilder2);
             }
 
+            if(info.target is GameSocket && info.targetMethod.Equals("Init"))
+            {
+                Console.WriteLine("gamesocket init");
+                this.gs = (GameSocket)info.target;
+            }
+
             return;
         }
 
@@ -249,7 +243,8 @@ namespace ScrollsPost {
             }
         }
 
-        public void onReconnect() {
+        public void onConnect(OnConnectData ocd)
+        {
             return;
         }
 
@@ -291,7 +286,7 @@ namespace ScrollsPost {
 
         public void StartReplayRunner(String path) {
             App.Communicator.addListener(this);
-            replayRunner = new ReplayRunner(this, path);
+            replayRunner = new ReplayRunner(this, path,gs);
         }
 
         public void StopReplayRunner() {

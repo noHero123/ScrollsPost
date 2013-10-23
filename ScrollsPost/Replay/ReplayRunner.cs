@@ -39,11 +39,22 @@ namespace ScrollsPost {
         //private FieldInfo speedField;
         private FieldInfo animFrameField;
         private MethodInfo nextMessageMethod;
+        private MethodInfo tmpUpdate;
+        private MethodInfo dispatchMessages;
+
         private ThreadedMessageParser parserField;
 
+        private GameSocket gs;
 
-        public ReplayRunner(ScrollsPost.Mod mod, String path) {
+        public void setgs(GameSocket gees)
+        {
+            Console.WriteLine("setgs");
+            this.gs=gees;
+        }
+
+        public ReplayRunner(ScrollsPost.Mod mod, String path, GameSocket gs) {
             this.mod = mod;
+            this.gs = gs;
             // Convert a .sgr replay to .spr
             if( path.EndsWith(".sgr") ) {
                 path = ConvertScrollsGuide(path);
@@ -90,30 +101,21 @@ namespace ScrollsPost {
             this.realTimeButtonStyle.fontSize = (int)Math.Round(this.buttonStyle.fontSize * 1.20f);
 
             sceneLoaded = false;
+            
+
+            deselectMethod = typeof(BattleMode).GetMethod("deselectAllTiles", BindingFlags.Instance | BindingFlags.NonPublic);
+            effectField = typeof(BattleMode).GetField("currentEffect", BindingFlags.NonPublic | BindingFlags.Instance);
+            animFrameField = typeof(AnimPlayer).GetField("_fframe", BindingFlags.NonPublic | BindingFlags.Instance);
+            nextMessageMethod = typeof(MiniCommunicator).GetMethod("_handleMessage", BindingFlags.NonPublic | BindingFlags.Instance);
+            //tmpUpdate = typeof(ThreadedMessageParser).GetMethod("update", BindingFlags.NonPublic | BindingFlags.Instance);
+            dispatchMessages = typeof(MiniCommunicator).GetMethod("_dispatchMessageToListeners", BindingFlags.NonPublic | BindingFlags.Instance);
+            Console.WriteLine("start replay");
+            
             playerThread = new Thread(new ThreadStart(Start));
             playerThread.Start();
         }
 
-        public void OnUpdate() {
-            if( parserField == null ) {
-                parserField = (ThreadedMessageParser) typeof(Communicator).GetField("messageParser", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(App.Communicator);
-            }
 
-            parserField.update();
-
-            if( parserField.hasMessage() ) {
-                nextMessageMethod.Invoke(App.Communicator, new object[] { });
-            }
-        }
-
-        public Boolean OnHandleNextMessage() {
-            if( msgPending ) {
-                msgPending = false;
-                return true;
-            } else {
-                return false;
-            }
-        }
 
         public void OnBattleGUI(InvocationInfo info) {
             // Bugs out visually otherwise
@@ -211,13 +213,6 @@ namespace ScrollsPost {
 
         public Boolean SpeedUpGame() {
             return speed <= 0.50f;
-        }
-
-        public void OnBattleEffectDone(InvocationInfo info) {
-            EffectMessage msg = (EffectMessage)effectField.GetValue(info.target);
-            if( msg != null && msg.type.Equals("TurnBegin") ) {
-                internalPause = false;
-            }
         }
 
         
@@ -470,23 +465,15 @@ namespace ScrollsPost {
             // Send it off
             sceneLoaded = true;
             SceneLoader.loadScene("_BattleModeView");
-
-            internalPause = true;
             foreach( var line in new string[] { gameInfo, stateText, effectText, turnLine } ) {
-                App.Communicator.setData(line);
-                msgPending = true;
 
-                while( msgPending ) {
-                    Thread.Sleep(10);
-                }
+                string messageName = MessageFactory.getMessageName(line);
+                Message message = MessageFactory.create(messageName, line);
+                dispatchMessages.Invoke(App.Communicator, new object[] { message });
 
                 Thread.Sleep(750);
             }
 
-            internalPause = false;
-            while( internalPause ) {
-                Thread.Sleep(10);
-            }
 
         }
 
@@ -498,11 +485,10 @@ namespace ScrollsPost {
             SceneLoader.loadScene("_Lobby");
 
             // Leave the channel it puts us in now
-            typeof(Communicator).GetField("isOnGameServer", BindingFlags.NonPublic | BindingFlags.Instance).SetValue(App.Communicator, false);
+            //typeof(Communicator).GetField("isOnGameServer", BindingFlags.NonPublic | BindingFlags.Instance).SetValue(App.Communicator, false);
 
-            String ip = typeof(Communicator).GetField("lastIp", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(App.Communicator).ToString();
-            int port = Convert.ToInt16(typeof(Communicator).GetField("lastPort", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(App.Communicator));
-            App.Communicator.makeConnection(ip, port);
+            IpPort lobbyIp = (IpPort)typeof(Communicator).GetField("lobbyAddress", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(App.Communicator);
+            App.Communicator.connect(lobbyIp);
 
 
             if( metadata != null && metadata.ContainsKey("game-id") ) {
@@ -539,7 +525,6 @@ namespace ScrollsPost {
                         metadata["white-id"] = (msg["whiteAvatar"] as Dictionary<String, object>)["profileId"];
                         metadata["black-name"] = msg["black"];
                         metadata["black-id"] = (msg["blackAvatar"] as Dictionary<String, object>)["profileId"];
-                        metadata["deck"] = msg["deck"];
                         metadata["game-id"] = msg["gameId"];
                         metadata["perspective"] = msg["color"];
 
@@ -668,14 +653,10 @@ namespace ScrollsPost {
         }
 
         private void Start() {
-            deselectMethod = typeof(BattleMode).GetMethod("deselectAllTiles", BindingFlags.Instance | BindingFlags.NonPublic);
-            effectField = typeof(BattleMode).GetField("currentEffect", BindingFlags.NonPublic | BindingFlags.Instance);
-            animFrameField = typeof(AnimPlayer).GetField("_fframe", BindingFlags.NonPublic | BindingFlags.Instance);
-            nextMessageMethod = typeof(Communicator).GetMethod("handleNextMessage", BindingFlags.NonPublic | BindingFlags.Instance);
 
+            Console.WriteLine("rprunner runns");
             String[] primaryUpgrade;
             String[] secondaryUpgrade = new string[] {};
-
             using( StreamReader primary = new StreamReader(this.replayPrimaryPath) ) {
                 metadata = PullMetadata(primary);
                 primaryUpgrade = UpgradeFile(metadata, this.replayPrimaryPath, primary);
@@ -684,6 +665,7 @@ namespace ScrollsPost {
                 if( String.IsNullOrEmpty(this.replaySecondaryPath) ) {
                     if( primaryUpgrade.Length == 0 )
                         ParseStreams(primary);
+                    Console.WriteLine("ende sparsing");
                
                 // Multi perspective replay
                 } else {
@@ -786,7 +768,7 @@ namespace ScrollsPost {
 
                     continue;
                 }
-
+                Console.WriteLine("no turn begin");
                 ParseLine(primaryID, line);
             }
 
@@ -800,10 +782,10 @@ namespace ScrollsPost {
         // Parse a single line from the replay
         private void ParseLine(String perspectiveID, String line, Boolean delay=true) {
             // Wait until the message was read off to dump it into the queue
-            while( msgPending || paused ) {
-                Thread.Sleep(paused ? 100 : 10);
-            }
 
+            //while( msgPending || paused ) {
+            //    Thread.Sleep(paused ? 100 : 10);
+            //}
             String[] parts = line.Split(new char[] { '|' }, 3);
 
             // Preserve the time taken between messages
@@ -814,16 +796,11 @@ namespace ScrollsPost {
                     Delay(1100);
                 }
             }
+            string part = parts[2].Replace(perspectiveID, App.MyProfile.ProfileInfo.id);
 
-            if( !sceneLoaded ) {
-                sceneLoaded = true;
-                SceneLoader.loadScene("_BattleModeView");
-            }
-
-            App.Communicator.setData(parts[2].Replace(perspectiveID, App.MyProfile.ProfileInfo.id));
-
-            wasPaused = false;
-            msgPending = true;
+            string messageName = MessageFactory.getMessageName(part);
+            Message message = MessageFactory.create(messageName, part);
+            dispatchMessages.Invoke(App.Communicator, new object[]{message});
 
             if( line.Contains("TurnBegin") ) {
                 internalPause = true;
@@ -834,6 +811,7 @@ namespace ScrollsPost {
                     timeout -= 1;
                 }
             }
+
         }
     }
 }

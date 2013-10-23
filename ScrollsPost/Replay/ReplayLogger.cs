@@ -71,7 +71,7 @@ namespace ScrollsPost {
                 metadata["black-id"] = info.getPlayerProfileId(TileColor.black);
                 metadata["white-name"] = info.getPlayerName(TileColor.white);
                 metadata["black-name"] = info.getPlayerName(TileColor.black);
-                metadata["deck"] = info.deck;
+                metadata["deck"] = "dont know";
                 metadata["game-id"] = Convert.ToDouble(info.gameId);
                 metadata["winner"] = "SPWINNERSP";
                 metadata["played-at"] = (int) lastMessage;
@@ -120,7 +120,8 @@ namespace ScrollsPost {
             lastMessage = epoch;
         }
 
-        public void onReconnect() {
+        public void onConnect(OnConnectData ocd)
+        {
             return;
         }
 

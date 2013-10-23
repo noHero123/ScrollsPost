@@ -51,7 +51,7 @@ namespace ScrollsPost {
 
         }
 
-        public void onReconnect() {
+        public void onConnect(OnConnectData ocd) {
 
         }
 

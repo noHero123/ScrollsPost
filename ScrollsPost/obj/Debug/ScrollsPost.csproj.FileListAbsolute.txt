@@ -1,0 +1,12 @@
+C:\Users\Thele\Documents\GitHub\ScrollsPost\ScrollsPost\bin\Debug\ScrollsPost.mod.dll
+C:\Users\Thele\Documents\GitHub\ScrollsPost\ScrollsPost\bin\Debug\ScrollsPost.mod.pdb
+C:\Users\Thele\Documents\GitHub\ScrollsPost\ScrollsPost\bin\Debug\Assembly-CSharp.dll
+C:\Users\Thele\Documents\GitHub\ScrollsPost\ScrollsPost\bin\Debug\JsonFx.dll
+C:\Users\Thele\Documents\GitHub\ScrollsPost\ScrollsPost\bin\Debug\LinFu.AOP.Interfaces.dll
+C:\Users\Thele\Documents\GitHub\ScrollsPost\ScrollsPost\bin\Debug\LinFu.Reflection.dll
+C:\Users\Thele\Documents\GitHub\ScrollsPost\ScrollsPost\bin\Debug\Mono.Cecil.dll
+C:\Users\Thele\Documents\GitHub\ScrollsPost\ScrollsPost\bin\Debug\ScrollsModLoader.Interfaces.dll
+C:\Users\Thele\Documents\GitHub\ScrollsPost\ScrollsPost\bin\Debug\UnityEngine.dll
+C:\Users\Thele\Documents\GitHub\ScrollsPost\ScrollsPost\obj\Debug\ScrollsPost.csprojResolveAssemblyReference.cache
+C:\Users\Thele\Documents\GitHub\ScrollsPost\ScrollsPost\obj\Debug\ScrollsPost.mod.dll
+C:\Users\Thele\Documents\GitHub\ScrollsPost\ScrollsPost\obj\Debug\ScrollsPost.mod.pdb
